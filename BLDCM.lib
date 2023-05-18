@@ -1,0 +1,78 @@
+* ********************************************************
+* BLDC motor modelling in LTspice
+* Created by Marcos Alonso, University of Oviedo, Spain
+* marcos@uniovi.es
+* For educational purposes only
+* Last update: May 4, 2022 
+* For information on this library, please visit:
+* https://www.youtube.com/c/MarcosAlonsoElectronics
+**********************************************************
+********************************************************************************************************
+* Subcircuit to generate BLDCM back emfs and hall sensor outputs
+********************************************************************************************************
+.subckt bemf a b c n thetat amp hc hb ha
+Ea a N value= {if(V(theta)<pi/6, V(amp)*V(theta)/(pi/6),if(V(theta)<5*pi/6, V(amp), 
++ if(V(theta)<7*pi/6, V(amp)-V(amp)*(V(theta)-5*pi/6)/(pi/6), if( V(theta)<11*pi/6, -V(amp), 
++ if(V(theta)<2*pi, -V(amp) + V(amp)*(V(theta)-11*pi/6)/(pi/6),0) ) ) ) )}
+Eb b N value={if(V(theta)<pi/2, -V(amp), if( V(theta)< 5*pi/6, -V(amp)+V(amp)*(V(theta)-3*pi/6)/(pi/6), 
++ if( V(theta)<9*pi/6, V(amp), if(V(theta)<11*pi/6, V(amp)-V(amp)*(V(theta)-9*pi/6)/(pi/6), 
++ if( V(theta)<2*pi, -V(amp), 0 ) ) ) ) )}
+Ec c N value={if(V(theta)<pi/6, V(amp), if( V(theta)<3*pi/6, V(amp)-V(amp)*(V(theta)-pi/6)/(pi/6), 
++ if(V(theta)<7*pi/6, -V(amp), if(V(theta)<9*pi/6, -V(amp)+V(amp)*(V(theta)-7*pi/6)/(pi/6), 
++ if( V(theta)<2*pi, V(amp), 0 ) ) ) ) ) }
+XUhc 0 ca hc comp Vhigh=5 Vlow=0
+Eca ca 0 value={V(c)-V(a)}
+XUhb 0 ab hb comp Vhigh=5 Vlow=0
+Eab ab 0 value={V(a)-V(b)}
+XUha bc 0 ha comp Vhigh=5 Vlow=0
+Ebc bc 0 value={V(b)-V(c)}
+Rin1 thetat 0 10Meg
+Rin2 amp 0 10Meg
+E1 theta 0 value={ ( V(thetat)/(2*pi) - floor( V(thetat)/(2*pi) ) )*2*pi}
+Rin4 theta 0 10Meg
+.ends bemf
+**************************************************************************
+* BLDC motor
+**************************************************************************
+.subckt bldcm pha phb phc tload ea eb ec ha hb hc te w wrpm thetarot nr
+XU1 a b c n thetat N007 hc hb ha bemf
+La N001 N002 {L-M}
+Lb N003 N004 {L-M}
+Lc N005 N006 {L-M}
+Ra N001 pha {R}
+Rb N003 phb {R}
+Rc N005 phc {R}
+XU2 thetarott thetat Gain A={npp}
+XUa N002 a ia isense k=1
+XUb N004 b ib isense k=1
+XUc N006 c ic isense k=1
+XU3 ea ia N008 mul
+XU4 eb ib N009 mul
+XU5 ec ic N017 mul
+XU6 N008 N009 N017 Pe Adder3
+XU7 Pe w Te div eps=1e-6
+XU8 Te N016 N010 Sub2
+XU9 N010 Tload N011 Sub2
+XU10 N016 Constant K={To}
+XU13 N011 N015 N012 div eps=0
+XU14 N015 Constant K={J}
+XU11 N012 N013 Integ ic=0
+XU12 N018 thetarott N019 mul
+XU15 N018 Constant K={Bv/J}
+XU16 N013 N019 N014 Sub2
+XU18 w N007 Gain A={Kv}
+XU21 w wrpm Gain A=60/(2*pi)
+XU22 a n ea Sub2
+XU23 b n eb Sub2
+XU24 c n ec Sub2
+XU17 w thetarott Integ ic=0
+XU29 N014 w abs k=1
+E1 nr 0 value={ floor( V(thetarott)/(2*pi) )}
+Rin1 nr 0 10Meg
+E2 thetarot 0 value={ ( V(thetarott)/(2*pi) - V(nr) )*2*pi}
+Rin2 thetarot 0 10Meg
+.ends bldcm
+
+
+
+
